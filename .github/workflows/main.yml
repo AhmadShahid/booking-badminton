@@ -2,7 +2,7 @@
 # TAKEACTIVE_EMAIL: Your login email.
 # TAKEACTIVE_PASSWORD: Your login password.
 
-name: TakeActive Auto-Booking
+name: Badminton Auto-Booking
 
 on:
   schedule:
