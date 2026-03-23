@@ -1,0 +1,81 @@
+# IMPORTANT: To enable this workflow in GitHub, you MUST add the following secrets to your repository:
+# TAKEACTIVE_EMAIL: Your login email.
+# TAKEACTIVE_PASSWORD: Your login password.
+
+name: TakeActive Auto-Booking
+
+on:
+  schedule:
+    # Run 1 minute early: 18:59 Berlin (17:59 UTC in winter)
+    - cron: '50 17 * * 1,5'
+  workflow_dispatch:
+
+jobs:
+  book-appointment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Timed booking loop
+        env:
+          TAKEACTIVE_EMAIL: ${{ secrets.TAKEACTIVE_EMAIL }}
+          TAKEACTIVE_PASSWORD: ${{ secrets.TAKEACTIVE_PASSWORD }}
+          CI: true
+        run: |
+          echo "Booking loop started at (UTC): $(date -u)"
+
+          echo "Attempt 1 at $(date -u)"
+          npm test && exit 0
+
+          echo "Waiting 5 minutes..."
+          sleep 300
+
+          echo "Attempt 2 at $(date -u)"
+          npm test && exit 0
+
+          echo "Waiting 3 minutes..."
+          sleep 180
+
+          echo "Attempt 3 at $(date -u)"
+          npm test && exit 0
+
+          echo "Waiting 2 minutes..."
+          sleep 120
+
+          echo "Attempt 4 at $(date -u)"
+          npm test && exit 0
+
+          echo "Waiting 1 minutes..."
+          sleep 60
+
+          echo "Attempt 5 at $(date -u)"
+          npm test && exit 0
+
+          echo "Waiting 1 minutes..."
+          sleep 60
+
+          echo "Attempt 6 at $(date -u)"
+          npm test && exit 0
+
+          echo "Waiting 1 minutes..."
+          sleep 60
+
+          echo "Attempt 7 at $(date -u)"
+          npm test && exit 0
+
+          echo "❌ Booking failed after 7 attempts"
+          exit 1
