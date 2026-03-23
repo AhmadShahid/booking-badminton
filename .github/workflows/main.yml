@@ -7,7 +7,7 @@ name: TakeActive Auto-Booking
 on:
   schedule:
     # Trigger early to account for GitHub jitter (16:40 UTC is 18:40/17:40 Berlin)
-    - cron: '40 16 * * 1,2,3,4,5'
+    - cron: '40 17 * * 1,2,3,4,5'
   workflow_dispatch:
 
 jobs:
@@ -29,29 +29,20 @@ jobs:
           node -e '
             const wait = () => {
               const now = new Date();
-              const formatter = new Intl.DateTimeFormat("en-US", {
-                timeZone: "Europe/Berlin",
-                year: "numeric", month: "numeric", day: "numeric",
-                hour: "numeric", minute: "numeric", second: "numeric", hour12: false
-              });
+              const berlinString = now.toLocaleString("en-US", {timeZone: "Europe/Berlin"});
+              const berlinNow = new Date(berlinString);
               
-              const parts = formatter.formatToParts(now).reduce((acc, part) => {
-                acc[part.type] = part.value;
-                return acc;
-              }, {});
+              const target = new Date(berlinString);
+              target.setHours(19, 0, 0, 0); // 7 PM Berlin
               
-              const berlinNow = new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-              const berlinTarget = new Date(berlinNow);
-              berlinTarget.setHours(19, 0, 0, 0);
+              const diffMs = target - berlinNow;
               
-              const diffMs = berlinTarget - berlinNow;
+              console.log("Current Berlin Time:", berlinString);
               if (diffMs > 0) {
-                console.log(`Current Berlin Time: ${berlinNow.toISOString().replace("T", " ")}`);
-                console.log(`Target Berlin Time:  ${berlinTarget.toISOString().replace("T", " ")}`);
-                console.log(`Waiting ${Math.round(diffMs/1000)} seconds...`);
+                console.log(`Waiting ${Math.round(diffMs/1000)} seconds until 7 PM Berlin...`);
                 setTimeout(() => process.exit(0), diffMs);
               } else {
-                console.log("Target time (7 PM Berlin) has already passed or is now. Proceeding immediately.");
+                console.log("It is already past 7 PM in Berlin. Proceeding immediately.");
                 process.exit(0);
               }
             };
