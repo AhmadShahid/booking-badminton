@@ -6,8 +6,8 @@ name: TakeActive Auto-Booking
 
 on:
   schedule:
-    # Run 1 minute early: 18:59 Berlin (17:59 UTC in winter)
-    - cron: '50 17 * * 1,5'
+    # Trigger early to account for GitHub jitter (16:40 UTC is 18:40/17:40 Berlin)
+    - cron: '40 16 * * 1,2,3,4,5'
   workflow_dispatch:
 
 jobs:
@@ -24,58 +24,60 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Wait for 7 PM Berlin
+        run: |
+          node -e '
+            const wait = () => {
+              const now = new Date();
+              const formatter = new Intl.DateTimeFormat("en-US", {
+                timeZone: "Europe/Berlin",
+                year: "numeric", month: "numeric", day: "numeric",
+                hour: "numeric", minute: "numeric", second: "numeric", hour12: false
+              });
+              
+              const parts = formatter.formatToParts(now).reduce((acc, part) => {
+                acc[part.type] = part.value;
+                return acc;
+              }, {});
+              
+              const berlinNow = new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+              const berlinTarget = new Date(berlinNow);
+              berlinTarget.setHours(19, 0, 0, 0);
+              
+              const diffMs = berlinTarget - berlinNow;
+              if (diffMs > 0) {
+                console.log(`Current Berlin Time: ${berlinNow.toISOString().replace("T", " ")}`);
+                console.log(`Target Berlin Time:  ${berlinTarget.toISOString().replace("T", " ")}`);
+                console.log(`Waiting ${Math.round(diffMs/1000)} seconds...`);
+                setTimeout(() => process.exit(0), diffMs);
+              } else {
+                console.log("Target time (7 PM Berlin) has already passed or is now. Proceeding immediately.");
+                process.exit(0);
+              }
+            };
+            wait();
+          '
+
       - name: Install dependencies
         run: npm ci
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Timed booking loop
+      - name: Booking Attempt
         env:
           TAKEACTIVE_EMAIL: ${{ secrets.TAKEACTIVE_EMAIL }}
           TAKEACTIVE_PASSWORD: ${{ secrets.TAKEACTIVE_PASSWORD }}
           CI: true
         run: |
-          echo "Booking loop started at (UTC): $(date -u)"
+          echo "Booking started at (UTC): $(date -u)"
 
-          echo "Attempt 1 at $(date -u)"
+          # Try 3 times with short delays in case of server load at 7 PM
+          npm test && exit 0 || echo "Attempt 1 failed, retrying in 10s..."
+          sleep 10
+          npm test && exit 0 || echo "Attempt 2 failed, retrying in 10s..."
+          sleep 10
           npm test && exit 0
 
-          echo "Waiting 5 minutes..."
-          sleep 300
-
-          echo "Attempt 2 at $(date -u)"
-          npm test && exit 0
-
-          echo "Waiting 3 minutes..."
-          sleep 180
-
-          echo "Attempt 3 at $(date -u)"
-          npm test && exit 0
-
-          echo "Waiting 2 minutes..."
-          sleep 120
-
-          echo "Attempt 4 at $(date -u)"
-          npm test && exit 0
-
-          echo "Waiting 1 minutes..."
-          sleep 60
-
-          echo "Attempt 5 at $(date -u)"
-          npm test && exit 0
-
-          echo "Waiting 1 minutes..."
-          sleep 60
-
-          echo "Attempt 6 at $(date -u)"
-          npm test && exit 0
-
-          echo "Waiting 1 minutes..."
-          sleep 60
-
-          echo "Attempt 7 at $(date -u)"
-          npm test && exit 0
-
-          echo "❌ Booking failed after 7 attempts"
+          echo "❌ Booking failed after 3 rapid attempts"
           exit 1
