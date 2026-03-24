@@ -59,6 +59,7 @@ jobs:
         env:
           TAKEACTIVE_EMAIL: ${{ secrets.TAKEACTIVE_EMAIL }}
           TAKEACTIVE_PASSWORD: ${{ secrets.TAKEACTIVE_PASSWORD }}
+          SLOTS_TO_BOOK: ${{ secrets.SLOTS_TO_BOOK }}
           CI: true
         run: |
           echo "Booking started at (UTC): $(date -u)"
