@@ -29,65 +29,81 @@ const slots = getSlotsToBook();
 test.describe('Automated Badminton Slot Booking', () => {
     let page;
 
-    test.beforeEach(async ({ browser }) => {
-        page = await browser.newPage();
-    });
-
-    test.afterEach(async () => {
-        await page.close();
-    });
-
     for (const slot of slots) {
-        test(`Book slot: ${slot.name}`, async () => {
-            const loginPage = new LoginPage(page);
-            const dashboardPage = new DashboardPage(page);
-            const email = process.env.TAKEACTIVE_EMAIL || 'shahidahmad527@gmail.com';
-            const password = process.env.TAKEACTIVE_PASSWORD || 'Onceuponatime123@';
-
-            console.log(`Starting booking for: ${slot.name}`);
+        test(`Book slot: ${slot.name}`, async ({ page }) => {
+            console.log(`[${slot.name}] Starting precision booking flow...`);
             
-            // Step 1: Login
-            console.log('Navigating to Login Page');
-            await loginPage.navigate();
-            console.log('Entering Credentials');
-            await loginPage.login(email, password);
+            // Step 1: Navigate to Badminton Dashboard early (Already logged in via setup)
+            console.log(`[${slot.name}] Pre-navigating to Badminton Dashboard...`);
+            await page.goto('https://takeactive.com/badminton-treptow/', { waitUntil: 'networkidle' }); 
 
-            // Step 2: Navigate to Badminton Dashboard
-            console.log('Navigating to Badminton Dashboard');
-            await dashboardPage.clickBadmintonCard();
-
-            // Step 3: Select the Slot
-            console.log(`Selecting Slot: ${slot.locator}`);
+            // Step 2: Select the Slot early
+            console.log(`[${slot.name}] Selecting Slot: ${slot.locator}`);
             await page.waitForSelector(slot.locator, { timeout: 15000 });
             await page.click(slot.locator);
             
-            // Wait for detail page or response
-            await page.waitForResponse(
-                (response) => response.url().includes('badminton-treptow/') && response.status() === 200,
-                { timeout: 10000 }
-            ).catch(() => console.log('Response wait timed out, continuing...'));
+            // Wait for detail page to load
+            await page.waitForURL(/badminton-treptow\/\d+/, { timeout: 10000 });
+            console.log(`[${slot.name}] On-site at detail page. Waiting for 7 PM Berlin precision trigger...`);
 
-            // Step 4: Book the slot or confirm it's already booked
+            // Step 3: Precision Wait until exactly 7 PM Berlin
+            await page.evaluate(() => {
+                return new Promise(resolve => {
+                    const getBerlinTime = () => {
+                        return new Date(new Date().toLocaleString("en-US", {timeZone: "Europe/Berlin"}));
+                    };
+
+                    const target = getBerlinTime();
+                    target.setHours(19, 0, 0, 0);
+
+                    const tick = () => {
+                        const now = getBerlinTime();
+                        const diff = target - now;
+                        
+                        if (diff <= 0) {
+                            resolve(); // TRIGGER!
+                        } else if (diff > 100) {
+                            setTimeout(tick, 50); // High frequency check
+                        } else {
+                            setImmediate(tick); // Maximum precision for last 100ms
+                        }
+                    };
+                    tick();
+                });
+            });
+
+            console.log(`[${slot.name}] 🚀 7 PM HIT! Executing booking...`);
+
+            // Step 4: Intensive refresh/check loop for the booking button
             const teilnehmenBtn = page.getByRole('button', { name: 'Teilnehmen' });
             const stornierenBtn = page.getByRole('button', { name: 'Stornieren' });
 
-            // Wait until one of the buttons is visible
-            console.log('Checking booking state on detail page...');
-            await expect(teilnehmenBtn.or(stornierenBtn)).toBeVisible({ timeout: 15000 });
+            // Since we were already on the page, the button might need a quick reload 
+            // if it was disabled or hidden before 7 PM. 
+            // Many sites update in-place or need a reload.
+            let attempt = 0;
+            while (attempt < 5) {
+                const isStornieren = await stornierenBtn.isVisible();
+                if (isStornieren) {
+                    console.log(`[${slot.name}] Slot is already booked.`);
+                    return;
+                }
 
-            const alreadyBooked = await stornierenBtn.isVisible();
+                const isTeilnehmen = await teilnehmenBtn.isVisible();
+                if (isTeilnehmen) {
+                    console.log(`[${slot.name}] Clicking "Teilnehmen" button!`);
+                    await teilnehmenBtn.click();
+                    break;
+                }
 
-            if (alreadyBooked) {
-                console.log(`Slot "${slot.name}" is already booked (Stornieren button found).`);
-            } else {
-                console.log(`Booking "${slot.name}" (clicking Teilnehmen)`);
-                await teilnehmenBtn.click();
-
-                // Validate booking succeeded by checking button changed to "Stornieren"
-                console.log('Validating booking succeeded...');
-                await expect(stornierenBtn).toBeVisible({ timeout: 10000 });
-                console.log(`SUCCESS: Slot "${slot.name}" is now booked.`);
+                console.log(`[${slot.name}] Button not found yet, reloading page (Attempt ${attempt + 1})...`);
+                await page.reload({ waitUntil: 'domcontentloaded' });
+                attempt++;
             }
+
+            // Final Validation
+            await expect(stornierenBtn).toBeVisible({ timeout: 10000 });
+            console.log(`[${slot.name}] ✅ SUCCESS: Slot is now booked.`);
         });
     }
 });

@@ -5,3 +5,5 @@ blob-report/
 playwright/.cache/
 debug-*.png
 .env
+.auth/
+
