@@ -12,6 +12,12 @@ setup('authenticate', async ({ page }) => {
     console.log('Authenticating once for all tests...');
     await loginPage.navigate();
     await loginPage.login(email, password);
+    
+    // Dismiss cookie banner if it exists
+    const cookieBtn = page.getByRole('button', { name: 'Einverstanden' });
+    if (await cookieBtn.isVisible()) {
+        await cookieBtn.click();
+    }
 
     // Wait for the login to be successful (should land on dashboard or see a logout/profile button)
     // Here we wait for direct URL or card visibility

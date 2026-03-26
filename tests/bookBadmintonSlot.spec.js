@@ -47,25 +47,39 @@ test.describe('Automated Badminton Slot Booking', () => {
             console.log(`[${slot.name}] On-site at detail page. Waiting for 7 PM Berlin precision trigger...`);
 
             // Step 3: Precision Wait until exactly 7 PM Berlin
-            await page.evaluate(() => {
+            await page.evaluate(async () => {
+                const getBerlinTime = () => {
+                    return new Date(new Date().toLocaleString("en-US", {timeZone: "Europe/Berlin"}));
+                };
+
+                const target = getBerlinTime();
+                target.setHours(19, 0, 0, 0);
+
                 return new Promise(resolve => {
-                    const getBerlinTime = () => {
-                        return new Date(new Date().toLocaleString("en-US", {timeZone: "Europe/Berlin"}));
-                    };
-
-                    const target = getBerlinTime();
-                    target.setHours(19, 0, 0, 0);
-
+                    let lastLoggedMessage = "";
                     const tick = () => {
                         const now = getBerlinTime();
                         const diff = target - now;
                         
                         if (diff <= 0) {
                             resolve(); // TRIGGER!
-                        } else if (diff > 100) {
-                            setTimeout(tick, 50); // High frequency check
                         } else {
-                            setImmediate(tick); // Maximum precision for last 100ms
+                            const secondsLeft = Math.ceil(diff / 1000);
+                            const minutesLeft = Math.floor(secondsLeft / 60);
+                            const msg = `Wait: ${minutesLeft}m ${secondsLeft % 60}s remaining...`;
+                            
+                            // Log every 60 seconds or if less than 10 seconds remaining
+                            if (msg !== lastLoggedMessage && (secondsLeft % 60 === 0 || secondsLeft <= 10)) {
+                                console.log(msg);
+                                lastLoggedMessage = msg;
+                            }
+
+                            if (diff > 100) {
+                                setTimeout(tick, 50); // High frequency check
+                            } else {
+                                // @ts-ignore
+                                (window.setImmediate || setTimeout)(tick, 0); // Maximum precision for last 100ms
+                            }
                         }
                     };
                     tick();
