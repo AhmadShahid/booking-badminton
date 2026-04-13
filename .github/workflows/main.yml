@@ -8,7 +8,7 @@ on:
   schedule:
     # Trigger at 16:30 UTC (17:30 CET / 18:30 CEST)
     # This provides a 30-90 min buffer for GitHub jitter and DST.
-    - cron: '40 17 * * 1,2,3,4,5'
+    - cron: '43 16 * * 1,2,3,4,5'
   workflow_dispatch:
 
 jobs:
